@@ -1,0 +1,78 @@
+#ec2.tf file -----------------------------------------------------------------------
+
+resource "aws_instance" "jenkins" {
+  ami  = "ami-00874d747dde814fa"
+  instance_type = "t2.micro"
+  key_name = aws_key_pair.jkn-key.key_name
+  vpc_security_group_ids = [aws_security_group.jenkins-sg.id]
+  user_data = file("${path.module}/user-data.sh")
+
+  tags = {
+    Name = "jenkins"
+  }
+
+  connection {
+    type        = "ssh"
+    user        = "ubuntu"
+    private_key = file("${path.module}/id_rsa")
+    host        = self.public_ip
+  }
+} 
+
+resource "aws_key_pair" "jkn-key" {
+  key_name   = "jkn-key"
+  public_key = file("${path.module}/id_rsa.pub")
+}
+
+
+resource "aws_security_group" "jenkins-sg" {
+  name        = "jenkins-sg"
+  description = "Allow TLS inbound traffic"
+  
+
+  ingress {
+    
+    from_port        = 8080
+    to_port          = 8080
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    
+  }
+
+  ingress {
+    
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    
+  }
+
+  tags = {
+    Name = "allow_tls"
+  }
+}
+
+#user.sh file to run script-----------------------------------------------------------------------
+
+
+#!/bin/bash
+sudo apt update -y 
+sudo apt install openjdk-11-jre -y
+curl -fsSL https://pkg.jenkins.io/debian/jenkins.io.key | sudo tee \
+  /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt-get update -y
+sudo apt-get install jenkins -y
+sudo systemctl start jenkins 
+
